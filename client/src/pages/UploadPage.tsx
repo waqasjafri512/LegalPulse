@@ -1,15 +1,17 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { 
-  Upload, 
-  FileText, 
-  CheckCircle, 
-  AlertCircle, 
-  Cloud, 
-  HardDrive, 
+import {
+  Upload,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  Cloud,
+  HardDrive,
   Loader2,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -46,7 +48,6 @@ export default function UploadPage() {
         try {
           const { data } = await api.post('/integrations/google-drive/tokens', { code });
           setGoogleDriveToken(data.access_token);
-          // Remove code from URL
           window.history.replaceState({}, document.title, window.location.pathname);
           toast.success('Google Drive connected!');
         } catch (error) {
@@ -77,11 +78,11 @@ export default function UploadPage() {
       });
 
       setFiles((prev) =>
-        prev.map((f) => (f.id === fileObj.id ? { 
-          ...f, 
-          status: 'complete', 
-          isDuplicate: response.data.is_duplicate 
-        } : f))
+        prev.map((f) =>
+          f.id === fileObj.id
+            ? { ...f, status: 'complete', isDuplicate: response.data.is_duplicate }
+            : f
+        )
       );
     } catch (error) {
       setFiles((prev) =>
@@ -109,6 +110,10 @@ export default function UploadPage() {
     setIsSuccess(true);
   };
 
+  const removeFile = (id: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
@@ -125,30 +130,58 @@ export default function UploadPage() {
   };
 
   if (isSuccess && !isUploading) {
-    const completed = files.filter(f => f.status === 'complete').length;
-    const duplicates = files.filter(f => f.isDuplicate).length;
+    const completed = files.filter((f) => f.status === 'complete').length;
+    const duplicates = files.filter((f) => f.isDuplicate).length;
 
     return (
-      <div style={{ maxWidth: 600, margin: '60px auto', textAlign: 'center' }} className="animate-fade-in">
-        <div style={{ 
-          width: 80, height: 80, borderRadius: '50%', background: 'var(--color-success-subtle)', 
-          color: 'var(--color-success)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' 
-        }}>
-          <CheckCircle size={40} />
+      <div style={{ maxWidth: 520, margin: '80px auto', textAlign: 'center' }} className="animate-fade-in">
+        <div
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: 24,
+            background: 'rgba(52,211,153,0.1)',
+            color: '#34d399',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 28px',
+            boxShadow: '0 0 40px rgba(52,211,153,0.15)',
+          }}
+        >
+          <CheckCircle size={36} />
         </div>
-        <h1 style={{ fontSize: 32, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 12 }}>
+        <h1
+          style={{
+            fontSize: 28,
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+            marginBottom: 10,
+            letterSpacing: '-0.02em',
+          }}
+        >
           Upload Complete
         </h1>
-        <p style={{ fontSize: 16, color: 'var(--color-text-secondary)', marginBottom: 32 }}>
-          {completed} documents have been successfully queued for AI processing.
-          {duplicates > 0 && ` ${duplicates} documents were identified as duplicates and skipped.`}
+        <p style={{ fontSize: 15, color: 'var(--color-text-tertiary)', marginBottom: 36, lineHeight: 1.6 }}>
+          {completed} documents queued for AI processing.
+          {duplicates > 0 && ` ${duplicates} duplicates skipped.`}
         </p>
-        <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-          <button className="btn btn-secondary" onClick={() => { setFiles([]); setIsSuccess(false); }}>
-            <RefreshCw size={16} /> Upload More
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              setFiles([]);
+              setIsSuccess(false);
+            }}
+          >
+            <RefreshCw size={14} /> Upload More
           </button>
-          <Link to="/contracts" className="btn btn-primary" style={{ textDecoration: 'none' }}>
-            Go to Repository <ArrowRight size={16} />
+          <Link
+            to="/contracts"
+            className="btn btn-primary"
+            style={{ textDecoration: 'none' }}
+          >
+            Go to Repository <ArrowRight size={14} />
           </Link>
         </div>
       </div>
@@ -157,107 +190,300 @@ export default function UploadPage() {
 
   return (
     <div>
+      {/* Header */}
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <Upload size={14} style={{ color: 'var(--color-accent)' }} />
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: 'var(--color-accent)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}
+          >
+            Ingest
+          </span>
+        </div>
+        <h1
+          style={{
+            fontSize: 28,
+            fontWeight: 700,
+            color: 'var(--color-text-primary)',
+            letterSpacing: '-0.02em',
+            marginBottom: 4,
+          }}
+        >
           Upload Contracts
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
-          Drag and drop files or import from cloud storage. AI will automatically extract key terms.
+        <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)' }}>
+          Drag and drop files or import from cloud storage. AI extracts key terms automatically.
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      {/* Upload area & integrations */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
+        {/* Dropzone */}
         <div
           {...getRootProps()}
           style={{
             gridColumn: '1 / -1',
-            padding: '48px 40px',
-            borderRadius: 'var(--radius-lg)',
-            border: `2px dashed ${isDragActive ? 'var(--color-accent)' : 'var(--color-border)'}`,
-            background: isDragActive ? 'var(--color-accent-subtle)' : 'var(--color-bg-card)',
+            padding: '52px 40px',
+            borderRadius: 14,
+            border: `2px dashed ${isDragActive ? 'var(--color-accent)' : 'var(--color-border-card)'}`,
+            background: isDragActive ? 'rgba(129,140,248,0.04)' : 'rgba(16,20,28,0.4)',
             textAlign: 'center',
             cursor: 'pointer',
+            transition: 'all 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
           <input {...getInputProps()} />
-          <div style={{
-            width: 56, height: 56, borderRadius: 'var(--radius-xl)', background: 'var(--color-bg-tertiary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px'
-          }}>
-            <Upload size={24} style={{ color: 'var(--color-accent)' }} />
+
+          {/* Top decorative line */}
+          {isDragActive && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: '25%',
+                right: '25%',
+                height: 2,
+                background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)',
+              }}
+            />
+          )}
+
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 18,
+              background: isDragActive ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.03)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 18px',
+              transition: 'all 0.25s',
+            }}
+          >
+            <Upload size={26} style={{ color: isDragActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }} />
           </div>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
+          <h3
+            style={{
+              fontSize: 17,
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              marginBottom: 6,
+            }}
+          >
             {isDragActive ? 'Drop files here' : 'Drag & drop contract files'}
           </h3>
-          <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>
             Supports PDF and DOCX — up to 50MB each
           </p>
-          <button className="btn btn-primary" style={{ pointerEvents: 'none' }}>Browse Files</button>
+          <button className="btn btn-accent" style={{ pointerEvents: 'none' }}>
+            <Sparkles size={13} /> Browse Files
+          </button>
         </div>
 
-        <button 
-          className="glass-card" 
+        {/* Google Drive */}
+        <button
+          className="glass-card"
           onClick={handleGoogleDriveConnect}
-          style={{ 
-            padding: 20, 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 14, 
+          style={{
+            padding: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
             cursor: 'pointer',
-            background: googleDriveToken ? 'var(--color-success-subtle)' : 'var(--color-bg-card)',
-            borderColor: googleDriveToken ? 'var(--color-success)' : 'var(--color-border)',
+            background: googleDriveToken ? 'rgba(52,211,153,0.04)' : 'rgba(16,20,28,0.4)',
+            borderColor: googleDriveToken ? 'rgba(52,211,153,0.15)' : 'var(--color-border-card)',
+            textAlign: 'left',
+            transition: 'all 0.2s',
           }}
         >
-          <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: 'rgba(66,133,244,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: 'rgba(66,133,244,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
             <Cloud size={20} style={{ color: '#4285F4' }} />
           </div>
-          <div style={{ textAlign: 'left' }}>
+          <div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
               {googleDriveToken ? 'Google Drive Connected' : 'Google Drive'}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
               {googleDriveToken ? 'Ready to browse files' : 'Import from connected Drive'}
             </div>
           </div>
         </button>
 
-        <button className="glass-card" style={{ padding: 20, display: 'flex', alignItems: 'center', gap: 14, cursor: 'not-allowed', opacity: 0.7 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-md)', background: 'rgba(0,126,229,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Dropbox */}
+        <button
+          className="glass-card"
+          style={{
+            padding: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            cursor: 'not-allowed',
+            opacity: 0.5,
+            textAlign: 'left',
+          }}
+        >
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: 'rgba(0,126,229,0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
             <HardDrive size={20} style={{ color: '#007ee5' }} />
           </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>Dropbox</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>Coming Soon</div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              Dropbox
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Coming Soon</div>
           </div>
         </button>
       </div>
 
+      {/* File Queue */}
       {files.length > 0 && (
-        <div className="glass-card" style={{ padding: 20 }}>
+        <div className="glass-card animate-fade-in" style={{ padding: 22 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              Queue ({files.length} files)
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              Queue
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: 'var(--color-text-muted)',
+                  background: 'rgba(255,255,255,0.04)',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                }}
+              >
+                {files.length} files
+              </span>
             </h3>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-ghost" onClick={() => setFiles([])} disabled={isUploading}>Clear</button>
-              <button className="btn btn-primary" onClick={startUploads} disabled={isUploading || !files.some(f => f.status === 'queued')}>
-                {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                {isUploading ? 'Uploading...' : 'Process All'}
+              <button className="btn btn-ghost" onClick={() => setFiles([])} disabled={isUploading} style={{ fontSize: 12.5 }}>
+                Clear
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={startUploads}
+                disabled={isUploading || !files.some((f) => f.status === 'queued')}
+              >
+                {isUploading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Sparkles size={14} />
+                )}
+                {isUploading ? 'Processing...' : 'Process All'}
               </button>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {files.map((f) => (
-              <div key={f.id} style={{ padding: 12, background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-subtle)' }}>
+              <div
+                key={f.id}
+                style={{
+                  padding: '12px 14px',
+                  background: 'rgba(255,255,255,0.015)',
+                  borderRadius: 10,
+                  border: '1px solid var(--color-border-subtle)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Progress bar */}
+                {f.status === 'uploading' && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      height: 2,
+                      width: `${f.progress}%`,
+                      background: 'linear-gradient(90deg, #6366f1, #818cf8)',
+                      borderRadius: 2,
+                      transition: 'width 0.3s',
+                    }}
+                  />
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <FileText size={18} style={{ color: 'var(--color-accent)' }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.file.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{formatSize(f.file.size)}</div>
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 9,
+                      background: f.status === 'complete' ? 'rgba(52,211,153,0.08)' : f.status === 'error' ? 'rgba(248,113,113,0.08)' : 'rgba(129,140,248,0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <FileText
+                      size={16}
+                      style={{
+                        color: f.status === 'complete' ? '#34d399' : f.status === 'error' ? '#f87171' : 'var(--color-accent)',
+                      }}
+                    />
                   </div>
-                  {f.status === 'complete' && <CheckCircle size={16} style={{ color: 'var(--color-success)' }} />}
-                  {f.status === 'error' && <AlertCircle size={16} style={{ color: 'var(--color-danger)' }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: 'var(--color-text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {f.file.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{formatSize(f.file.size)}</div>
+                  </div>
+                  {f.status === 'complete' && <CheckCircle size={16} style={{ color: '#34d399' }} />}
+                  {f.status === 'error' && <AlertCircle size={16} style={{ color: '#f87171' }} />}
                   {f.status === 'uploading' && <Loader2 size={16} className="animate-spin" style={{ color: 'var(--color-accent)' }} />}
+                  {f.status === 'queued' && (
+                    <button
+                      onClick={() => removeFile(f.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 4,
+                        display: 'flex',
+                        borderRadius: 6,
+                      }}
+                    >
+                      <X size={14} style={{ color: 'var(--color-text-muted)' }} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
