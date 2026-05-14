@@ -27,6 +27,9 @@ export class Contract {
   @Column()
   file_url: string;
 
+  @Column({ nullable: true })
+  file_mimetype: string;
+
   @Column({ type: 'integer', nullable: true })
   file_size_bytes: number;
 
@@ -78,6 +81,9 @@ export class Contract {
   @Column({ type: 'integer', nullable: true })
   risk_score: number;
 
+  @Column({ type: 'text', nullable: true })
+  summary: string;
+
   @Column({ type: 'jsonb', nullable: true })
   ai_extraction_raw: any;
 
@@ -107,13 +113,13 @@ export class Contract {
   @JoinColumn({ name: 'org_id' })
   org: Org;
 
-  @Column()
+  @Column({ type: 'text' })
   org_id: string;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'owner_id' })
   owner: User;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   owner_id: string;
 }

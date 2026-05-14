@@ -78,4 +78,14 @@ export class ContractsController {
     if (!orgId) throw new BadRequestException('Org ID missing');
     return this.contractsService.search(query, orgId);
   }
+
+  @Post(':id/delete') // Using Post for better compatibility or just @Delete
+  @ApiOperation({ summary: 'Delete a contract' })
+  async remove(@Param('id') id: string, @Req() req: any) {
+    const orgId = req.user.orgId;
+    if (!orgId) {
+      throw new BadRequestException('User is not associated with an organization');
+    }
+    return this.contractsService.remove(id, orgId);
+  }
 }
