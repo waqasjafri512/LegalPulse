@@ -5,11 +5,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { verifyToken } from '@clerk/backend';
+import { verifyToken, createClerkClient } from '@clerk/backend';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
-  constructor(private configService: ConfigService) {}
+  private clerkClient;
+
+  constructor(private configService: ConfigService) {
+    this.clerkClient = createClerkClient({
+      secretKey: this.configService.get<string>('CLERK_SECRET_KEY'),
+    });
+  }
 
   async canActivate(executionContext: ExecutionContext): Promise<boolean> {
     const request = executionContext.switchToHttp().getRequest();
@@ -27,18 +33,37 @@ export class ClerkAuthGuard implements CanActivate {
     try {
       const decoded = await verifyToken(token, {
         secretKey: this.configService.get<string>('CLERK_SECRET_KEY'),
-        clockSkewInMs: 60000, // Allow 60 seconds of clock skew
+        clockSkewInMs: 60000,
       });
 
       if (!decoded) {
         throw new UnauthorizedException('Invalid token');
       }
 
+      // Extract orgId from various possible claim locations
+      let orgId = (decoded as any).org_id || (decoded as any).o?.id;
+
+      // Fallback: If org_id is missing from JWT, fetch user's memberships
+      if (!orgId) {
+        try {
+          const memberships = await this.clerkClient.users.getOrganizationMembershipList({
+            userId: decoded.sub,
+          });
+          
+          if (memberships && memberships.data.length > 0) {
+            orgId = memberships.data[0].organization.id;
+            console.log(`Fallback: Using first organization found for user ${decoded.sub}: ${orgId}`);
+          }
+        } catch (err) {
+          console.error('Failed to fetch Clerk memberships for fallback:', err.message);
+        }
+      }
+
       // Inject user and org data into request
       request.user = {
         clerkId: decoded.sub,
-        email: decoded.email, // This depends on your Clerk session token claims
-        orgId: decoded.org_id, // Custom claim if using Clerk Organizations
+        email: (decoded as any).email,
+        orgId: orgId,
       };
 
       return true;

@@ -18,6 +18,8 @@ import { WebhooksService } from './modules/webhooks/webhooks.service';
 import { MailModule } from './common/mail/mail.module';
 import { SlackModule } from './common/slack/slack.module';
 import { GoogleDriveModule } from './modules/integrations/google-drive/google-drive.module';
+import { StatsModule } from './modules/stats/stats.module';
+
 
 @Module({
   imports: [
@@ -76,7 +78,9 @@ import { GoogleDriveModule } from './modules/integrations/google-drive/google-dr
     MailModule,
     SlackModule,
     GoogleDriveModule,
+    StatsModule,
   ],
+
   controllers: [AppController, WebhooksController],
   providers: [AppService, WebhooksService],
 })
