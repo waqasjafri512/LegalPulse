@@ -33,10 +33,11 @@ graph TD
 
 ### 1. Intelligent Contract Lifecycle
 - **Automated Extraction**: Pulls 15+ critical data points (Effective Date, Termination, Liability Caps, Governing Law) using a dedicated AI extraction engine.
-- **Confidence Scoring**: Every AI-extracted field includes a confidence score, highlighting items that require human verification.
-- **Split-Pane Viewer**: Compare extracted terms side-by-side with the original document in a high-fidelity PDF viewer.
+- **Virtual PDF Experience**: Custom-built rendering engine that converts plain text or corrupted files into professional, high-fidelity document views for seamless review.
+- **Split-Pane Viewer**: Compare extracted terms side-by-side with the original document with real-time field highlighting.
 
 ### 2. Proactive Risk Management
+- **Automated Compliance Scanning**: Every document is automatically scanned for legal risks (e.g. expirations, renewal traps) upon upload.
 - **Smart Alerts**: Multi-channel notifications (Slack, Email, In-app) for upcoming expiration dates and auto-renewal deadlines.
 - **Dynamic Dashboard**: Real-time visualization of portfolio health, active alerts, and matter statuses.
 
