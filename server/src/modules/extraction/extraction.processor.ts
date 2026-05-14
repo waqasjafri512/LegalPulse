@@ -52,60 +52,64 @@ export class ExtractionProcessor extends WorkerHost {
       this.logger.log(`Processing ${contract.title} with mimetype: ${mimetype}`);
 
       // 3. Process with AI (Extraction)
-      const aiData = await this.extractionService.processWithAI(contract.file_url, mimetype);
-      if (!aiData) {
+      const aiResponse = await this.extractionService.processWithAI(contract.file_url, mimetype);
+      if (!aiResponse || !aiResponse.extraction) {
         throw new Error('AI extraction returned no data');
       }
 
-      this.logger.log(`AI extraction returned fields: ${Object.keys(aiData).join(', ')}`);
+      const { extraction, fullText } = aiResponse;
+      this.logger.log(`AI extraction returned fields: ${Object.keys(extraction).join(', ')}`);
 
       // 4. Generate Embedding for Semantic Search
-      const textToEmbed = `${contract.title} ${aiData.counterparty_name || ''} ${aiData.summary || ''}`;
+      const textToEmbed = `${contract.title} ${extraction.counterparty_name || ''} ${extraction.summary || ''}`;
       const embedding = await this.extractionService.generateEmbedding(textToEmbed);
-
+ 
       // 5. Map ONLY known entity fields from AI data (avoid spreading unknown fields)
       const updateData: Partial<Contract> = {
         status: 'completed',
-        ai_extraction_raw: aiData,
+        ai_extraction_raw: extraction,
+        full_text: fullText,
       };
-
+ 
       // Map each known field safely
-      if (aiData.contract_type) updateData.contract_type = String(aiData.contract_type);
-      if (aiData.counterparty_name) updateData.counterparty_name = String(aiData.counterparty_name);
-      if (aiData.governing_law) updateData.governing_law = String(aiData.governing_law);
-      if (aiData.liability_cap) updateData.liability_cap = String(aiData.liability_cap);
-      if (aiData.indemnification_party) updateData.indemnification_party = String(aiData.indemnification_party);
-      if (aiData.payment_terms) updateData.payment_terms = String(aiData.payment_terms);
-      if (aiData.auto_renewal_terms) updateData.auto_renewal_terms = String(aiData.auto_renewal_terms);
-      if (aiData.summary) updateData.summary = String(aiData.summary);
-      if (aiData.summary) updateData.notes = String(aiData.summary); // Also save to notes
-
+      if (extraction.contract_type && contract.contract_type !== 'Matter Document') {
+        updateData.contract_type = String(extraction.contract_type);
+      }
+      if (extraction.counterparty_name) updateData.counterparty_name = String(extraction.counterparty_name);
+      if (extraction.governing_law) updateData.governing_law = String(extraction.governing_law);
+      if (extraction.liability_cap) updateData.liability_cap = String(extraction.liability_cap);
+      if (extraction.indemnification_party) updateData.indemnification_party = String(extraction.indemnification_party);
+      if (extraction.payment_terms) updateData.payment_terms = String(extraction.payment_terms);
+      if (extraction.auto_renewal_terms) updateData.auto_renewal_terms = String(extraction.auto_renewal_terms);
+      if (extraction.summary) updateData.summary = String(extraction.summary);
+      if (extraction.summary) updateData.notes = String(extraction.summary); // Also save to notes
+ 
       // Numeric fields
-      if (aiData.contract_value != null && !isNaN(Number(aiData.contract_value))) {
-        updateData.contract_value = Number(aiData.contract_value);
+      if (extraction.contract_value != null && !isNaN(Number(extraction.contract_value))) {
+        updateData.contract_value = Number(extraction.contract_value);
       }
-      if (aiData.termination_notice_days != null && !isNaN(Number(aiData.termination_notice_days))) {
-        updateData.termination_notice_days = Number(aiData.termination_notice_days);
+      if (extraction.termination_notice_days != null && !isNaN(Number(extraction.termination_notice_days))) {
+        updateData.termination_notice_days = Number(extraction.termination_notice_days);
       }
-      if (aiData.risk_score != null && !isNaN(Number(aiData.risk_score))) {
-        updateData.risk_score = Number(aiData.risk_score);
+      if (extraction.risk_score != null && !isNaN(Number(extraction.risk_score))) {
+        updateData.risk_score = Number(extraction.risk_score);
       }
-
+ 
       // Boolean fields
-      if (aiData.auto_renewal != null) {
-        updateData.auto_renewal = Boolean(aiData.auto_renewal);
+      if (extraction.auto_renewal != null) {
+        updateData.auto_renewal = Boolean(extraction.auto_renewal);
       }
-      if (aiData.termination_for_convenience != null) {
-        updateData.termination_for_convenience = Boolean(aiData.termination_for_convenience);
+      if (extraction.termination_for_convenience != null) {
+        updateData.termination_for_convenience = Boolean(extraction.termination_for_convenience);
       }
-
+ 
       // Date fields — parse safely
-      if (aiData.effective_date) {
-        const parsed = new Date(aiData.effective_date);
+      if (extraction.effective_date) {
+        const parsed = new Date(extraction.effective_date);
         if (!isNaN(parsed.getTime())) updateData.effective_date = parsed;
       }
-      if (aiData.expiration_date) {
-        const parsed = new Date(aiData.expiration_date);
+      if (extraction.expiration_date) {
+        const parsed = new Date(extraction.expiration_date);
         if (!isNaN(parsed.getTime())) updateData.expiration_date = parsed;
       }
 

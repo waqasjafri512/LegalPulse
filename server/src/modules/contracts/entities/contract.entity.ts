@@ -10,6 +10,14 @@ import {
 import { Org } from '../../orgs/entities/org.entity';
 import { User } from '../../users/entities/user.entity';
 
+export enum ContractStage {
+  REVIEW = 'review',
+  NEGOTIATION = 'negotiation',
+  ACTIVE = 'active',
+  EXPIRED = 'expired',
+  ARCHIVED = 'archived',
+}
+
 @Entity('contracts')
 export class Contract {
   @PrimaryGeneratedColumn('uuid')
@@ -23,6 +31,13 @@ export class Contract {
 
   @Column({ default: 'processing' })
   status: string;
+
+  @Column({
+    type: 'enum',
+    enum: ContractStage,
+    default: ContractStage.REVIEW,
+  })
+  stage: ContractStage;
 
   @Column()
   file_url: string;
@@ -84,6 +99,12 @@ export class Contract {
   @Column({ type: 'text', nullable: true })
   summary: string;
 
+  @Column({ type: 'text', nullable: true })
+  full_text: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
   @Column({ type: 'jsonb', nullable: true })
   ai_extraction_raw: any;
 
@@ -95,9 +116,6 @@ export class Contract {
 
   @Column({ type: 'text', array: true, default: '{}' })
   tags: string[];
-
-  @Column({ type: 'text', nullable: true })
-  notes: string;
 
   // Vector column for pgvector semantic search (handled as string or specific type in TypeORM)
   @Column({ type: 'text', nullable: true })

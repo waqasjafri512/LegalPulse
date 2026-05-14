@@ -23,7 +23,7 @@ export class ContractsService {
     @InjectQueue('extraction') private readonly extractionQueue: Queue,
   ) {}
 
-  async uploadContract(file: Express.Multer.File, orgId: string, userId: string) {
+  async uploadContract(file: Express.Multer.File, orgId: string, userId: string, documentType?: string) {
     try {
       this.logger.log(`Uploading contract for org: ${orgId}`);
 
@@ -89,6 +89,7 @@ export class ContractsService {
       // 2. Create database record
       const contract = this.contractRepository.create({
         title: file.originalname,
+        contract_type: documentType || 'Contract',
         file_url: uploadResult.secure_url,
         file_mimetype: file.mimetype,
         file_size_bytes: file.size,
@@ -178,5 +179,14 @@ export class ContractsService {
     }
     await this.contractRepository.remove(contract);
     return { success: true };
+  }
+
+  async update(id: string, data: Partial<Contract>, orgId: string) {
+    const contract = await this.findOne(id, orgId);
+    if (!contract) {
+      throw new Error('Contract not found');
+    }
+    Object.assign(contract, data);
+    return this.contractRepository.save(contract);
   }
 }

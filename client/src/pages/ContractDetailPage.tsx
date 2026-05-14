@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Download,
@@ -14,6 +14,12 @@ import {
   ExternalLink,
   TrendingUp,
   Scale,
+  Circle,
+  PlayCircle,
+  MessageSquare,
+  Send,
+  X,
+  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../lib/api';
@@ -27,6 +33,14 @@ const sectionConfigs = [
   { id: 'dates', label: 'Key Dates', icon: Clock, fields: ['effective_date', 'expiration_date', 'opt_out_deadline'] },
 ];
 
+const lifecycleStages = [
+  { id: 'review', label: 'Review', description: 'AI Extraction & Metadata Audit' },
+  { id: 'negotiation', label: 'Negotiation', description: 'Legal Terms Refinement' },
+  { id: 'active', label: 'Active', description: 'Fully Executed & In Effect' },
+  { id: 'expired', label: 'Expired', description: 'Contract Term Completed' },
+  { id: 'archived', label: 'Archived', description: 'Historical Record Only' },
+];
+
 export default function ContractDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,6 +48,12 @@ export default function ContractDetailPage() {
   const [isValidating, setIsValidating] = useState(false);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [isFetchingText, setIsFetchingText] = useState(false);
+  
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const { data: contract, isLoading, error } = useQuery({
     queryKey: ['contract', id],
@@ -43,6 +63,47 @@ export default function ContractDetailPage() {
     },
     enabled: !!id,
   });
+
+  const updateStageMutation = useMutation({
+    mutationFn: async (stage: string) => {
+      await api.patch(`/contracts/${id}`, { stage });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contract', id] });
+      toast.success('Contract stage updated');
+    },
+    onError: () => {
+      toast.error('Failed to update stage');
+    }
+  });
+
+  const chatMutation = useMutation({
+    mutationFn: async (query: string) => {
+      const response = await api.post(`/contracts/${id}/chat`, { query });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setChatMessages(prev => [...prev, { role: 'ai', content: data.answer }]);
+    },
+    onError: () => {
+      toast.error('AI failed to respond');
+      setChatMessages(prev => [...prev, { role: 'ai', content: 'Sorry, I encountered an error. Please try again.' }]);
+    }
+  });
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || chatMutation.isPending) return;
+
+    const userMessage = chatInput.trim();
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setChatInput('');
+    chatMutation.mutate(userMessage);
+  };
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   // Fetch text content for non-PDF or fake-PDF files
   useEffect(() => {
@@ -63,7 +124,7 @@ export default function ContractDetailPage() {
   const handleValidate = async () => {
     setIsValidating(true);
     try {
-      await api.patch(`/contracts/${id}`, { status: 'completed' });
+      await api.patch(`/contracts/${id}`, { status: 'completed', stage: 'active' });
       queryClient.invalidateQueries({ queryKey: ['contract', id] });
       toast.success('Metadata validated successfully');
     } catch (error) {
@@ -167,14 +228,14 @@ export default function ContractDetailPage() {
   };
 
   return (
-    <div>
+    <div style={{ position: 'relative' }}>
       {/* Header */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 14,
-          marginBottom: 24,
+          marginBottom: 20,
         }}
       >
         <button
@@ -206,6 +267,13 @@ export default function ContractDetailPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <button 
+            className="btn btn-accent" 
+            onClick={() => setIsChatOpen(true)}
+            style={{ padding: '8px 14px', background: 'var(--color-accent)', color: 'white' }}
+          >
+            <Sparkles size={14} /> Ask AI
+          </button>
           <a
             href={contract.file_url}
             target="_blank"
@@ -235,13 +303,99 @@ export default function ContractDetailPage() {
         </div>
       </div>
 
+      {/* Lifecycle Stepper */}
+      <div 
+        className="glass-card animate-fade-in" 
+        style={{ 
+          padding: '16px 20px', 
+          marginBottom: 20, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid var(--color-border-subtle)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+          <div style={{ 
+            width: 32, 
+            height: 32, 
+            borderRadius: 10, 
+            background: 'var(--color-accent-subtle)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center' 
+          }}>
+            <PlayCircle size={18} style={{ color: 'var(--color-accent)' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lifecycle Stage</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{lifecycleStages.find(s => s.id === contract.stage)?.label || 'In Review'}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 3, justifyContent: 'center' }}>
+          {lifecycleStages.map((stage, index) => {
+            const isCompleted = lifecycleStages.findIndex(s => s.id === contract.stage) >= index;
+            const isCurrent = contract.stage === stage.id;
+            
+            return (
+              <div key={stage.id} style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                <button
+                  onClick={() => updateStageMutation.mutate(stage.id)}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    background: isCurrent ? 'var(--color-accent)' : isCompleted ? 'var(--color-accent-subtle)' : 'var(--color-bg-tertiary)',
+                    border: isCurrent ? '4px solid var(--color-bg-primary)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isCurrent ? 'white' : isCompleted ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    zIndex: 2,
+                    boxShadow: isCurrent ? '0 0 15px var(--color-accent-subtle)' : 'none'
+                  }}
+                  title={stage.description}
+                >
+                  {isCompleted && !isCurrent ? <CheckCircle size={16} /> : <Circle size={isCurrent ? 8 : 12} fill={isCurrent ? "white" : "none"} />}
+                </button>
+                {index < lifecycleStages.length - 1 && (
+                  <div style={{ 
+                    width: 60, 
+                    height: 2, 
+                    background: isCompleted && lifecycleStages.findIndex(s => s.id === contract.stage) > index ? 'var(--color-accent)' : 'var(--color-border-subtle)',
+                    zIndex: 1
+                  }} />
+                )}
+                {/* Tooltip Label */}
+                <div style={{ 
+                  position: 'absolute', 
+                  top: 40, 
+                  left: '50%', 
+                  transform: 'translateX(-50%)', 
+                  fontSize: 10, 
+                  fontWeight: isCurrent ? 700 : 500,
+                  color: isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {stage.label}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Split Pane */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 400px',
           gap: 18,
-          minHeight: 'calc(100vh - 160px)',
+          minHeight: 'calc(100vh - 250px)',
         }}
       >
         {/* Left — Preview Viewer */}
@@ -496,6 +650,118 @@ export default function ContractDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* AI Chat Sidebar */}
+      {isChatOpen && (
+        <div 
+          className="glass-card animate-fade-in"
+          style={{
+            position: 'fixed',
+            right: 20,
+            bottom: 20,
+            width: 400,
+            height: 600,
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: 0,
+            boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            border: '1px solid var(--color-accent-subtle)',
+            background: 'var(--color-bg-primary)'
+          }}
+        >
+          {/* Chat Header */}
+          <div style={{ 
+            padding: '16px 20px', 
+            borderBottom: '1px solid var(--color-border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--color-bg-tertiary)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Sparkles size={18} style={{ color: 'var(--color-accent)' }} />
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)' }}>Legal AI Assistant</div>
+                <div style={{ fontSize: 11, color: 'var(--color-success)' }}>● Analyzing {contract.title}</div>
+              </div>
+            </div>
+            <button 
+              className="btn btn-ghost" 
+              style={{ padding: 4 }}
+              onClick={() => setIsChatOpen(false)}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Chat Messages */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {chatMessages.length === 0 && (
+              <div style={{ textAlign: 'center', marginTop: 40 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: 'var(--color-accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                  <MessageSquare size={24} style={{ color: 'var(--color-accent)' }} />
+                </div>
+                <h4 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>Ask anything about this contract</h4>
+                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 240, margin: '0 auto' }}>
+                  "What are the payment terms?" or "Summarize the termination clause."
+                </p>
+              </div>
+            )}
+            {chatMessages.map((msg, i) => (
+              <div key={i} style={{ 
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '85%',
+                background: msg.role === 'user' ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                color: msg.role === 'user' ? 'white' : 'var(--color-text-primary)',
+                padding: '10px 14px',
+                borderRadius: msg.role === 'user' ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                fontSize: 13,
+                lineHeight: 1.5,
+                boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+              }}>
+                {msg.content}
+              </div>
+            ))}
+            {chatMutation.isPending && (
+              <div style={{ alignSelf: 'flex-start', background: 'var(--color-bg-tertiary)', padding: '10px 14px', borderRadius: '14px 14px 14px 2px', display: 'flex', gap: 4 }}>
+                <div className="animate-bounce" style={{ width: 4, height: 4, background: 'var(--color-accent)', borderRadius: '50%' }}></div>
+                <div className="animate-bounce" style={{ width: 4, height: 4, background: 'var(--color-accent)', borderRadius: '50%', animationDelay: '0.2s' }}></div>
+                <div className="animate-bounce" style={{ width: 4, height: 4, background: 'var(--color-accent)', borderRadius: '50%', animationDelay: '0.4s' }}></div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Chat Input */}
+          <form 
+            onSubmit={handleSendMessage}
+            style={{ 
+              padding: 16, 
+              borderTop: '1px solid var(--color-border-subtle)',
+              display: 'flex',
+              gap: 10
+            }}
+          >
+            <input 
+              type="text"
+              className="input"
+              placeholder="Type your question..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              style={{ flex: 1, borderRadius: 12, height: 40 }}
+            />
+            <button 
+              type="submit" 
+              className="btn btn-primary"
+              disabled={chatMutation.isPending || !chatInput.trim()}
+              style={{ width: 40, height: 40, padding: 0, borderRadius: 12, flexShrink: 0 }}
+            >
+              <Send size={18} />
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

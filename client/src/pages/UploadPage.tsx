@@ -30,6 +30,7 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [googleDriveToken, setGoogleDriveToken] = useState<string | null>(null);
+  const [documentType, setDocumentType] = useState('Contract');
 
   const handleGoogleDriveConnect = async () => {
     try {
@@ -61,6 +62,7 @@ export default function UploadPage() {
   const uploadFile = async (fileObj: UploadFile) => {
     const formData = new FormData();
     formData.append('file', fileObj.file);
+    formData.append('document_type', documentType);
 
     try {
       setFiles((prev) =>
@@ -177,11 +179,11 @@ export default function UploadPage() {
             <RefreshCw size={14} /> Upload More
           </button>
           <Link
-            to="/contracts"
+            to={documentType === 'Contract' ? "/contracts" : "/matters"}
             className="btn btn-primary"
             style={{ textDecoration: 'none' }}
           >
-            Go to Repository <ArrowRight size={14} />
+            Go to {documentType === 'Contract' ? "Repository" : "Matters"} <ArrowRight size={14} />
           </Link>
         </div>
       </div>
@@ -215,11 +217,49 @@ export default function UploadPage() {
             marginBottom: 4,
           }}
         >
-          Upload Contracts
+          Upload {documentType === 'Contract' ? 'Contracts' : 'Matter Documents'}
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)' }}>
-          Drag and drop files or import from cloud storage. AI extracts key terms automatically.
+        <p style={{ fontSize: 14, color: 'var(--color-text-tertiary)', marginBottom: 20 }}>
+          Drag and drop files or import from cloud storage. AI extracts key details automatically.
         </p>
+        
+        {/* Document Type Selector */}
+        <div style={{ display: 'inline-flex', background: 'rgba(255, 255, 255, 0.03)', padding: 4, borderRadius: 10, border: '1px solid var(--color-border-subtle)' }}>
+          <button 
+            type="button"
+            onClick={() => setDocumentType('Contract')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              background: documentType === 'Contract' ? 'var(--color-accent)' : 'transparent',
+              color: documentType === 'Contract' ? 'white' : 'var(--color-text-secondary)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Contract
+          </button>
+          <button 
+            type="button"
+            onClick={() => setDocumentType('Matter Document')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              background: documentType === 'Matter Document' ? 'var(--color-accent)' : 'transparent',
+              color: documentType === 'Matter Document' ? 'white' : 'var(--color-text-secondary)',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Matter Document
+          </button>
+        </div>
       </div>
 
       {/* Upload area & integrations */}
@@ -248,9 +288,9 @@ export default function UploadPage() {
               style={{
                 position: 'absolute',
                 top: 0,
-                left: '25%',
-                right: '25%',
-                height: 2,
+                left: 0,
+                right: 0,
+                height: 3,
                 background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)',
               }}
             />
@@ -258,28 +298,31 @@ export default function UploadPage() {
 
           <div
             style={{
-              width: 60,
-              height: 60,
-              borderRadius: 18,
-              background: isDragActive ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.03)',
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: isDragActive ? 'var(--color-accent)' : 'rgba(255, 255, 255, 0.03)',
+              color: isDragActive ? 'white' : 'var(--color-text-secondary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 18px',
-              transition: 'all 0.25s',
+              margin: '0 auto 20px',
+              transition: 'all 0.3s ease',
+              transform: isDragActive ? 'scale(1.1) translateY(-4px)' : 'scale(1)',
+              boxShadow: isDragActive ? '0 12px 24px rgba(129,140,248,0.25)' : 'none',
             }}
           >
-            <Upload size={26} style={{ color: isDragActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }} />
+            <Upload size={24} />
           </div>
           <h3
             style={{
-              fontSize: 17,
+              fontSize: 18,
               fontWeight: 600,
               color: 'var(--color-text-primary)',
               marginBottom: 6,
             }}
           >
-            {isDragActive ? 'Drop files here' : 'Drag & drop contract files'}
+            {isDragActive ? 'Drop files here' : `Drag & drop ${documentType === 'Contract' ? 'contract' : 'matter'} files`}
           </h3>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>
             Supports PDF and DOCX — up to 50MB each

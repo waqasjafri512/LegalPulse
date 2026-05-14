@@ -9,6 +9,7 @@ import {
   UseGuards,
   Body,
   Req,
+  Patch,
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -16,12 +17,37 @@ import { ApiTags, ApiOperation, ApiConsumes, ApiBody, ApiBearerAuth } from '@nes
 import { ContractsService } from './contracts.service';
 import { ClerkAuthGuard } from '../../common/guards/clerk-auth.guard';
 
+import axios from 'axios';
+
 @ApiTags('contracts')
 @ApiBearerAuth()
 @UseGuards(ClerkAuthGuard)
 @Controller('contracts')
 export class ContractsController {
   constructor(private readonly contractsService: ContractsService) {}
+
+  @Post(':id/chat')
+  @ApiOperation({ summary: 'Chat with the contract using AI' })
+  async chat(@Param('id') id: string, @Body('query') query: string, @Req() req: any) {
+    const orgId = req.user.orgId;
+    if (!orgId) throw new BadRequestException('Org ID missing');
+
+    const contract = await this.contractsService.findOne(id, orgId);
+    if (!contract || !contract.full_text) {
+      throw new BadRequestException('Contract text not found for AI analysis');
+    }
+
+    try {
+      const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.post(`${aiServiceUrl}/api/chat`, {
+        text: contract.full_text,
+        query: query
+      });
+      return response.data;
+    } catch (error) {
+      throw new BadRequestException('AI Service failed to respond');
+    }
+  }
 
   @Post('upload')
   @ApiOperation({ summary: 'Upload a contract file' })
@@ -38,7 +64,11 @@ export class ContractsController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File, 
+    @Req() req: any,
+    @Body('document_type') documentType?: string
+  ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
@@ -48,7 +78,7 @@ export class ContractsController {
       throw new BadRequestException('User is not associated with an organization');
     }
 
-    return this.contractsService.uploadContract(file, orgId, req.user.clerkId);
+    return this.contractsService.uploadContract(file, orgId, req.user.clerkId, documentType);
   }
 
   @Get()
@@ -87,5 +117,15 @@ export class ContractsController {
       throw new BadRequestException('User is not associated with an organization');
     }
     return this.contractsService.remove(id, orgId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update contract details' })
+  async update(@Param('id') id: string, @Body() data: any, @Req() req: any) {
+    const orgId = req.user.orgId;
+    if (!orgId) {
+      throw new BadRequestException('User is not associated with an organization');
+    }
+    return this.contractsService.update(id, data, orgId);
   }
 }

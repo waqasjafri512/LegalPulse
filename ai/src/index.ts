@@ -13,6 +13,51 @@ const port = process.env.AI_PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// New Chat with Contract endpoint
+app.post('/api/chat', async (req: Request, res: Response) => {
+  const { text, query } = req.body;
+
+  if (!text || !query) {
+    return res.status(400).json({ error: 'Text and query are required' });
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.x.ai/v1/chat/completions',
+      {
+        model: 'grok-1',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert legal assistant. Use the following contract text to answer the user's question accurately. 
+            If the information is not in the contract, say so clearly. 
+            Keep your answer professional, concise, and focused on legal accuracy.
+            
+            CONTRACT TEXT:
+            ${text.substring(0, 10000)}` // Limit context size
+          },
+          {
+            role: 'user',
+            content: query
+          }
+        ],
+        temperature: 0.1
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.GROK_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    res.json({ answer: response.data.choices[0].message.content });
+  } catch (error: any) {
+    console.error('AI Chat Error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to generate AI response' });
+  }
+});
+
 // 📝 Text Extraction from Buffer
 async function extractText(buffer: Buffer, mimetype: string): Promise<string> {
   if (mimetype === 'application/pdf') {
@@ -107,21 +152,24 @@ ${text.substring(0, 30000)}
       }
     );
 
-    const rawContent = aiResponse.data.choices[0].message.content;
+    const aiContent = aiResponse.data.choices[0].message.content;
     let extraction;
-    
     try {
-      extraction = JSON.parse(rawContent);
-    } catch (parseError) {
-      console.error('Failed to parse AI response as JSON:', rawContent);
+      // Find JSON block in response
+      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+      extraction = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiContent);
+    } catch (parseErr) {
+      console.error('Failed to parse AI JSON:', aiContent);
       return res.status(500).json({ error: 'AI returned invalid JSON' });
     }
-    
-    console.log('Extraction successful:', Object.keys(extraction));
-    res.json({ success: true, extraction, textLength: text.length });
-  } catch (error: any) {
-    console.error('Extraction failed:', error?.response?.data || error.message);
-    res.status(500).json({ error: error?.response?.data?.error?.message || error.message });
+
+    res.json({
+      extraction,
+      fullText: text
+    });
+  } catch (err: any) {
+    console.error('Extraction Error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'AI Extraction failed' });
   }
 });
 

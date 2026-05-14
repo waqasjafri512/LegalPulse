@@ -17,13 +17,7 @@ export class ExtractionService {
         { timeout: 120000 } // 2 minute timeout for large files
       );
 
-      if (!response.data.success) {
-        this.logger.error(`AI Service returned error: ${response.data.error}`);
-        return null;
-      }
-
-      this.logger.log(`AI extraction completed, text length: ${response.data.textLength}`);
-      return response.data.extraction;
+      return response.data;
     } catch (error: any) {
       this.logger.error(
         `AI Service extraction failed: ${error?.response?.data?.error || error.message}`,
