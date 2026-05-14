@@ -1,105 +1,58 @@
 import { Injectable, Logger } from '@nestjs/common';
-import mammoth from 'mammoth';
 import axios from 'axios';
 
 @Injectable()
 export class ExtractionService {
   private readonly logger = new Logger(ExtractionService.name);
+  private readonly aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:3001';
 
-  async extractText(buffer: Buffer, mimetype: string): Promise<string> {
+  async processWithAI(fileUrl: string, mimetype: string): Promise<any> {
     try {
-      // 📄 PDF HANDLING (FIXED FOR ESM/CJS MISMATCH)
-      if (mimetype === 'application/pdf') {
-        const pdfModule = await import('pdf-parse');
-
-        // Safe fallback for both export styles
-        const pdf =
-          (pdfModule as any).default || (pdfModule as any);
-
-        const data = await pdf(buffer);
-        return data.text;
-      }
-
-      // 📝 DOCX / DOC HANDLING
-      if (
-        mimetype ===
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        mimetype === 'application/msword'
-      ) {
-        const result = await mammoth.extractRawText({ buffer });
-        return result.value;
-      }
-
-      throw new Error(`Unsupported mimetype: ${mimetype}`);
-    } catch (error: any) {
-      this.logger.error(
-        `Text extraction failed: ${error?.message || error}`,
-      );
-      throw error;
-    }
-  }
-
-  async processWithAI(text: string): Promise<any> {
-    const grokApiKey = process.env.GROK_API_KEY;
-
-    if (!grokApiKey) {
-      this.logger.warn('GROK_API_KEY is missing, skipping AI extraction');
-      return null;
-    }
-
-    const prompt = `
-You are a specialized legal AI assistant. Extract key contract terms.
-
-Return ONLY JSON with:
-- contract_type
-- classification_confidence
-- counterparty_name
-- effective_date
-- expiration_date
-- auto_renewal
-- governing_law
-- contract_value
-- liability_cap
-- termination_notice_days
-- extraction_confidence
-- summary
-- key_risks (max 3)
-
-Contract Text:
-${text.substring(0, 30000)}
-`;
-
-    try {
+      this.logger.log(`Calling AI Service for extraction: ${fileUrl.substring(0, 80)}...`);
+      this.logger.log(`AI Service URL: ${this.aiServiceUrl}/extract`);
+      
       const response = await axios.post(
-        'https://api.grok.com/v1/chat/completions',
-        {
-          model: 'grok-1',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0,
-          response_format: { type: 'json_object' },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${grokApiKey}`,
-            'Content-Type': 'application/json',
-          },
-        },
+        `${this.aiServiceUrl}/extract`,
+        { fileUrl, mimetype },
+        { timeout: 120000 } // 2 minute timeout for large files
       );
 
-      return JSON.parse(response.data.choices[0].message.content);
+      if (!response.data.success) {
+        this.logger.error(`AI Service returned error: ${response.data.error}`);
+        return null;
+      }
+
+      this.logger.log(`AI extraction completed, text length: ${response.data.textLength}`);
+      return response.data.extraction;
     } catch (error: any) {
       this.logger.error(
-        `AI processing failed: ${error?.message || error}`,
+        `AI Service extraction failed: ${error?.response?.data?.error || error.message}`,
       );
       return null;
     }
   }
 
-  async fetchFileBuffer(url: string): Promise<Buffer> {
-    const response = await axios.get(url, {
-      responseType: 'arraybuffer',
-    });
+  async generateEmbedding(text: string): Promise<number[] | null> {
+    try {
+      this.logger.log(`Calling AI Service for embedding...`);
+      
+      const response = await axios.post(
+        `${this.aiServiceUrl}/embed`,
+        { text },
+        { timeout: 30000 }
+      );
 
-    return Buffer.from(response.data);
+      if (response.data.skipped) {
+        this.logger.warn('Embedding was skipped (no OpenAI key configured)');
+        return null;
+      }
+
+      return response.data.embedding;
+    } catch (error: any) {
+      this.logger.error(
+        `AI Service embedding failed: ${error?.response?.data?.error || error.message}`,
+      );
+      return null;
+    }
   }
 }

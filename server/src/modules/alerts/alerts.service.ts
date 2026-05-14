@@ -4,9 +4,9 @@ import { Repository, LessThanOrEqual } from 'typeorm';
 import { Alert, AlertPriority } from './entities/alert.entity';
 import { Contract } from '../contracts/entities/contract.entity';
 import { MailService } from '../common/mail/mail.service';
-import { UsersService } from '../users/users.service';
+import { User } from '../users/entities/user.entity';
 import { SlackService } from '../../common/slack/slack.service';
-import { OrgsService } from '../orgs/orgs.service';
+import { Org } from '../orgs/entities/org.entity';
 
 @Injectable()
 export class AlertsService {
@@ -17,10 +17,12 @@ export class AlertsService {
     private readonly alertRepository: Repository<Alert>,
     @InjectRepository(Contract)
     private readonly contractRepository: Repository<Contract>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Org)
+    private readonly orgRepository: Repository<Org>,
     private readonly mailService: MailService,
-    private readonly usersService: UsersService,
     private readonly slackService: SlackService,
-    private readonly orgsService: OrgsService,
   ) {}
 
   async findAllByOrg(orgId: string) {
@@ -30,87 +32,89 @@ export class AlertsService {
     });
   }
 
-  async markAsRead(id: string, orgId: string) {
-    await this.alertRepository.update({ id, org_id: orgId }, { is_read: true });
-    return { success: true };
+  async getUnreadCount(orgId: string) {
+    return this.alertRepository.count({
+      where: { org_id: orgId, is_read: false },
+    });
   }
 
-  /**
-   * Scans for contracts expiring in the next 30 days and creates alerts if they don't exist.
-   */
-  async generateAlertsForOrg(orgId: string) {
-    this.logger.log(`Generating alerts for org: ${orgId}`);
-    
+  async markAsRead(id: string, orgId: string) {
+    await this.alertRepository.update({ id, org_id: orgId }, { is_read: true });
+  }
+
+  async generateAlertsForOrg(org_id: string) {
+    this.logger.log(`Scanning alerts for org: ${org_id}`);
+
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
     const expiringContracts = await this.contractRepository.find({
       where: {
-        org_id: orgId,
+        org_id: org_id,
         expiration_date: LessThanOrEqual(thirtyDaysFromNow),
         status: 'completed',
       },
     });
 
-    const newAlerts = [];
     for (const contract of expiringContracts) {
+      if (!contract.expiration_date) continue;
+
       // Check if alert already exists for this contract and type
       const existing = await this.alertRepository.findOne({
-        where: { 
-          contract_id: contract.id, 
-          alert_type: 'expiration',
-          is_read: false 
+        where: {
+          contract_id: contract.id,
+          alert_type: 'EXPIRATION',
         },
       });
 
       if (!existing) {
+        this.logger.log(`Creating alert for contract: ${contract.title}`);
+
         const alert = this.alertRepository.create({
           title: `Contract Expiring: ${contract.title}`,
-          message: `The contract with ${contract.counterparty_name || 'Counterparty'} is set to expire on ${new Date(contract.expiration_date).toLocaleDateString()}.`,
-          alert_type: 'expiration',
+          message: `The contract "${contract.title}" with ${contract.counterparty_name || 'Counterparty'} is set to expire on ${new Date(contract.expiration_date).toLocaleDateString()}.`,
+          alert_type: 'EXPIRATION',
           priority: AlertPriority.HIGH,
-          is_read: false,
-          org_id: orgId,
+          org_id: contract.org_id,
           contract_id: contract.id,
+          trigger_date: new Date(), // Set trigger date to now
+          days_before: 30,
+          status: 'pending'
         });
-        newAlerts.push(alert);
 
-        // Send email notification
+        const savedAlert = await this.alertRepository.save(alert);
+
+        // Notify — Wrapped in try-catch to prevent 500 if integrations fail
         try {
-          const user = await this.usersService.findByClerkId(contract.owner_id);
-          if (user && user.email) {
-            await this.mailService.sendExpirationAlert(
-              user.email,
-              contract.title,
-              new Date(contract.expiration_date).toLocaleDateString()
-            );
+          const org = await this.orgRepository.findOne({ where: { id: org_id } });
+          const users = await this.userRepository.find({ where: { org_id } });
+
+          // Email Notifications
+          for (const user of users) {
+            if (user.email) {
+              await this.mailService.sendExpirationAlert(
+                user.email, 
+                contract.title, 
+                new Date(contract.expiration_date).toLocaleDateString()
+              );
+            }
           }
-        } catch (emailErr) {
-          this.logger.error(`Failed to send alert email for contract ${contract.id}: ${emailErr.message}`);
-        }
 
-        // Send Slack notification
-        try {
-          const org = await this.orgsService.findOne(orgId);
-          const slackChannel = org?.settings?.slackChannel;
-          if (slackChannel) {
+          // Slack Notifications
+          if (org?.settings?.slack_channel) {
             await this.slackService.sendExpirationAlert(
-              slackChannel,
+              org.settings.slack_channel,
               contract.title,
               new Date(contract.expiration_date).toLocaleDateString(),
               `https://legalpulse.ai/contracts/${contract.id}`
             );
           }
-        } catch (slackErr) {
-          this.logger.error(`Failed to send Slack alert for contract ${contract.id}: ${slackErr.message}`);
+        } catch (notifyError) {
+          this.logger.error(`Notification failed for alert ${savedAlert.id}: ${notifyError.message}`);
         }
       }
     }
 
-    if (newAlerts.length > 0) {
-      await this.alertRepository.save(newAlerts);
-    }
-
-    return { created: newAlerts.length };
+    return { processed: expiringContracts.length };
   }
 }

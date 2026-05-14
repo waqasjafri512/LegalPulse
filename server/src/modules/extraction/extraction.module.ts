@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ExtractionService } from './extraction.service';
 import { ExtractionProcessor } from './extraction.processor';
-import { ContractsModule } from '../contracts/contracts.module';
 import { Contract } from '../contracts/entities/contract.entity';
+import { AlertsModule } from '../alerts/alerts.module';
 
 @Module({
   imports: [
@@ -12,9 +12,10 @@ import { Contract } from '../contracts/entities/contract.entity';
       name: 'extraction',
     }),
     TypeOrmModule.forFeature([Contract]),
-    ContractsModule,
+    forwardRef(() => AlertsModule),
   ],
   providers: [ExtractionService, ExtractionProcessor],
-  exports: [BullModule],
+  exports: [ExtractionService, BullModule],
 })
 export class ExtractionModule {}
+
