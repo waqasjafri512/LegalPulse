@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { OrganizationProfile, useOrganization } from '@clerk/react';
+import api from '../lib/api';
 import { 
   Building2, 
   User, 
@@ -24,6 +25,30 @@ const tabs = [
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
   const { isLoaded } = useOrganization();
+  const [settings, setSettings] = useState<any>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await api.get('/users/me/settings');
+        setSettings(response.data);
+      } catch (err) {
+        console.error('Failed to fetch settings:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const updateSetting = async (key: string, value: any) => {
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    try {
+      await api.patch('/users/me/settings', { [key]: value });
+    } catch (err) {
+      console.error('Failed to update setting:', err);
+    }
+  };
 
   if (!isLoaded) {
     return (
@@ -117,12 +142,14 @@ export default function SettingsPage() {
 
         {/* Content Area */}
         <div 
-          className={activeTab === 'team' ? "animate-fade-in-scale" : "glass-card animate-fade-in-scale"} 
+          className="glass-card animate-fade-in-scale" 
           style={{ 
             padding: activeTab === 'team' ? 0 : 32, 
-            minHeight: '600px',
+            minHeight: '620px',
             position: 'relative',
-            background: activeTab === 'team' ? 'transparent' : 'rgba(16, 20, 28, 0.4)'
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
           }}
         >
           {activeTab === 'general' && (
@@ -176,31 +203,50 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'team' && (
-            <div style={{ width: '100%', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '100%', flex: 1, display: 'flex' }}>
               <OrganizationProfile 
                 appearance={{
                   elements: {
-                    rootBox: { width: '100%', maxWidth: '100%' },
+                    rootBox: { width: '100%', maxWidth: '100%', height: '100%', display: 'flex' },
                     card: { 
                       width: '100%', 
+                      height: '100%',
                       boxShadow: 'none', 
-                      background: 'var(--color-bg-card)', 
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-lg)'
+                      background: 'transparent', 
+                      border: 'none',
+                      padding: 0,
+                      display: 'flex',
+                      flexDirection: 'row'
                     },
-                    navbar: { display: 'none' },
-                    scrollBox: { borderRadius: 0 },
-                    pageScrollBox: { padding: '32px' },
+                    navbar: { 
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      borderRight: '1px solid var(--color-border-subtle)',
+                      padding: '20px 0',
+                      width: '200px'
+                    },
+                    navbarButton: {
+                      color: 'var(--color-text-tertiary)',
+                      borderRadius: 0,
+                      '&:hover': { background: 'rgba(255, 255, 255, 0.05)' }
+                    },
+                    navbarButton__active: {
+                      color: 'var(--color-accent)',
+                      background: 'var(--color-accent-subtle)',
+                      borderLeft: '2px solid var(--color-accent)'
+                    },
+                    scrollBox: { background: 'transparent' },
+                    pageScrollBox: { padding: '32px', background: 'transparent' },
                     headerTitle: { color: 'var(--color-text-primary)', fontSize: '20px', fontWeight: '700' },
                     headerSubtitle: { color: 'var(--color-text-tertiary)' },
                     membersPage__title: { color: 'var(--color-text-primary)' },
                     userPreviewMainIdentifier: { color: 'var(--color-text-primary)' },
                     userPreviewSecondaryIdentifier: { color: 'var(--color-text-tertiary)' },
+                    organizationSwitcherTrigger: { color: 'var(--color-text-primary)' },
                   },
                   variables: {
                     colorPrimary: '#818cf8',
                     colorText: '#eef2ff',
-                    colorBackground: '#10141c',
+                    colorBackground: '#0a0d14',
                     colorInputBackground: '#0a0d14',
                     colorInputText: '#eef2ff',
                   }
@@ -235,17 +281,120 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {(activeTab === 'notifications' || activeTab === 'security') && (
-            <div style={{ display: 'flex', height: '400px', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-              <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(255, 255, 255, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Sparkles size={28} style={{ color: 'var(--color-text-muted)' }} />
+          {activeTab === 'notifications' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Bell size={16} style={{ color: 'var(--color-accent)' }} />
+                </div>
+                <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
+                  Notification Preferences
+                </h2>
               </div>
-              <p style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-                Advanced {activeTab} settings are managed via your IDP
-              </p>
-              <button className="btn btn-secondary">
-                 Open Identity Manager <ChevronRight size={14} />
-              </button>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 600 }}>
+                <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 12 }}>
+                  Choose how you want to be notified about contract expirations and risk alerts.
+                </p>
+                
+                {[
+                  { id: 'email_alerts', title: 'Email Alerts', desc: 'Receive immediate summaries for critical contract events.' },
+                  { id: 'slack_integration', title: 'Slack Integration', desc: 'Push risk alerts directly to your legal-alerts channel.' },
+                  { id: 'weekly_summary', title: 'Weekly Summary', desc: 'A weekly digest of upcoming renewals and pending reviews.' },
+                  { id: 'ai_insights', title: 'AI Insights', desc: 'Get notified when AI discovers unusual patterns in new uploads.' }
+                ].map((item) => {
+                  const isEnabled = settings[item.id] ?? false;
+                  return (
+                    <div key={item.id} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: '16px 20px', 
+                      background: 'rgba(255, 255, 255, 0.02)', 
+                      borderRadius: 14,
+                      border: '1px solid var(--color-border-subtle)'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 2 }}>{item.title}</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{item.desc}</div>
+                      </div>
+                      <div 
+                        onClick={() => updateSetting(item.id, !isEnabled)}
+                        style={{ 
+                          width: 36, 
+                          height: 20, 
+                          borderRadius: 10, 
+                          background: isEnabled ? 'var(--color-accent)' : 'var(--color-bg-tertiary)',
+                          position: 'relative',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ 
+                          position: 'absolute', 
+                          right: isEnabled ? 3 : 'auto', 
+                          left: isEnabled ? 'auto' : 3,
+                          top: 3,
+                          width: 14, 
+                          height: 14, 
+                          borderRadius: '50%', 
+                          background: 'white' 
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: 12 }}>
+                   <Save size={14} /> Update Preferences
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Shield size={16} style={{ color: 'var(--color-accent)' }} />
+                </div>
+                <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
+                  Security & Authentication
+                </h2>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 600 }}>
+                <div style={{ padding: 20, background: 'rgba(255, 255, 255, 0.02)', borderRadius: 16, border: '1px solid var(--color-border-subtle)' }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>Password Management</h3>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 16 }}>
+                    Change your password or set up a secondary authentication method.
+                  </p>
+                  <button className="btn btn-secondary">Update Password</button>
+                </div>
+
+                <div style={{ padding: 20, background: 'rgba(255, 255, 255, 0.02)', borderRadius: 16, border: '1px solid var(--color-border-subtle)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>Multi-Factor Authentication (MFA)</h3>
+                      <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginBottom: 0 }}>
+                        Add an extra layer of security to your account using TOTP or SMS.
+                      </p>
+                    </div>
+                    <span className="badge badge-pending">Recommended</span>
+                  </div>
+                  <button className="btn btn-accent" style={{ marginTop: 16 }}>Enable MFA</button>
+                </div>
+
+                <div style={{ padding: 20, background: 'var(--color-accent-subtle)', borderRadius: 16, border: '1px solid var(--color-accent-glow)' }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>Single Sign-On (SSO)</h3>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
+                    Connect LegalPulse to your corporate Identity Provider (Okta, Azure AD, etc.)
+                  </p>
+                  <button className="btn btn-ghost" style={{ padding: 0, color: 'var(--color-accent)', fontWeight: 600 }}>
+                    Contact Enterprise Support <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

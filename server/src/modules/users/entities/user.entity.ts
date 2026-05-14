@@ -39,4 +39,7 @@ export class User {
 
   @Column()
   org_id: string;
+
+  @Column({ type: 'jsonb', default: {} })
+  settings: any;
 }
