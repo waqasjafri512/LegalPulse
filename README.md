@@ -43,6 +43,8 @@ graph TD
 
 ### 3. Matter & Collaboration
 - **Centralized Matter Log**: Track litigation, IP filings, and corporate governance matters.
+- **Unified Document Ingestion**: Upload Matter Documents directly into the AI pipeline for automated case-law extraction and intelligent tagging.
+- **Persistent User Settings**: Cloud-synced UI preferences and notification toggles secured via Clerk Identity integration.
 - **Role-Based Access Control (RBAC)**: Secure multi-tenant architecture ensuring data isolation between organizations.
 
 ### 4. Advanced AI Search
